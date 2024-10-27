@@ -1,0 +1,168 @@
+﻿@model List<APP.Models.Transaction>
+@{
+    ViewData["Title"] = "Transaction Management";
+}
+
+<div class="container mt-5">
+    <h4 class="text-center mb-5">Transaction Management</h4>
+
+    <!-- Upload Form -->
+    <div class="mb-4">
+        <h5>Upload Transaction File</h5>
+        <form method="post" enctype="multipart/form-data" asp-action="Upload">
+            <div class="input-group">
+                <input type="file" class="form-control" name="file" required />
+                <button class="btn btn-success" type="submit">Upload</button>
+            </div>
+            <p class="mt-2 text-success">@ViewBag.Message</p>
+        </form>
+    </div>
+
+    <!-- Search Form -->
+    <div class="mb-5">
+        <h5>Search Transactions</h5>
+        <form method="get" asp-action="Search" class="row g-3 align-items-center">
+            <div class="col-md-2">
+                <select name="searchType" class="form-select" id="searchType" onchange="toggleSearchFields()">
+                    <option value="all">All</option>
+                    <option value="currency">Currency</option>
+                    <option value="date">Date Range</option>
+                    <option value="status">Status</option>
+                </select>
+            </div>
+
+            <!-- Default Search Input -->
+            <div class="col-md-7" id="defaultSearchInput">
+                <input type="text" name="searchInput" class="form-control" id="searchInput" placeholder="Enter value..." disabled />
+            </div>
+
+            <!-- Date Range Inputs -->
+            <div class="col-md-7 d-none" id="dateRangeInputs">
+                <div class="row g-2">
+                    <div class="col">
+                        <input type="text" class="form-control" id="startDate" name="startDate" placeholder="Start Date and Time" disabled />
+                    </div>
+                    <div class="col">
+                        <input type="text" class="form-control" id="endDate" name="endDate" placeholder="End Date and Time" disabled />
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+            </div>
+        </form>
+    </div>
+
+    @if (Model != null && Model.Count > 0)
+    {
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-primary">
+                    <tr>
+                        <th>ID</th>
+                        <th>Transaction ID</th>
+                        <th>Amount</th>
+                        <th>Currency</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in Model)
+                    {
+                        <tr>
+                            <td>@transaction.Id</td>
+                            <td>@transaction.TransactionId</td>
+                            <td>@transaction.Amount</td>
+                            <td>@transaction.CurrencyCode</td>
+                            <td>@transaction.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <p class="text-center mt-4">No transactions found.</p>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Toggle Search Fields Based on Selection
+        function toggleSearchFields() {
+            const searchType = document.getElementById('searchType').value;
+            const searchInputDiv = document.getElementById('defaultSearchInput');
+            const searchInput = document.getElementById('searchInput');
+            const dateRangeInputs = document.getElementById('dateRangeInputs');
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            if (searchType === 'all') {
+                // Show the default input but disable it
+                searchInputDiv.classList.remove('d-none');
+                searchInput.value = '';
+                searchInput.setAttribute('disabled', 'disabled');
+
+                // Hide date range inputs and disable them
+                dateRangeInputs.classList.add('d-none');
+                startDateInput.value = '';
+                endDateInput.value = '';
+                startDateInput.setAttribute('disabled', 'disabled');
+                endDateInput.setAttribute('disabled', 'disabled');
+            } else if (searchType === 'date') {
+                // Hide the default input and disable it
+                searchInputDiv.classList.add('d-none');
+                searchInput.value = '';
+                searchInput.setAttribute('disabled', 'disabled');
+
+                // Show date range inputs and enable them
+                dateRangeInputs.classList.remove('d-none');
+                startDateInput.removeAttribute('disabled');
+                endDateInput.removeAttribute('disabled');
+            } else {
+                // Show the default input and enable it
+                searchInputDiv.classList.remove('d-none');
+                searchInput.removeAttribute('disabled');
+
+                // Hide date range inputs and disable them
+                dateRangeInputs.classList.add('d-none');
+                startDateInput.value = '';
+                endDateInput.value = '';
+                startDateInput.setAttribute('disabled', 'disabled');
+                endDateInput.setAttribute('disabled', 'disabled');
+            }
+        }
+
+        // Initialize Flatpickr for Date Range Inputs
+        flatpickr("#startDate", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+        });
+
+        flatpickr("#endDate", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+        });
+
+        // Call toggleSearchFields() on page load to initialize the correct state
+        document.addEventListener('DOMContentLoaded', function () {
+            toggleSearchFields();
+        });
+
+        // Initialize Flatpickr for Date Range Inputs
+        flatpickr("#startDate", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+        });
+
+        flatpickr("#endDate", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+        });
+
+        // Call toggleSearchFields() on page load to initialize the correct state
+        document.addEventListener('DOMContentLoaded', toggleSearchFields);
+    </script>
+}

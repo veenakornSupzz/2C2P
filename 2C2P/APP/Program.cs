@@ -8,6 +8,7 @@ namespace APP
 
             // Add services to the container.
             builder.Services.AddControllersWithViews();
+            builder.Services.AddHttpClient();
 
             var app = builder.Build();
 
@@ -28,7 +29,7 @@ namespace APP
 
             app.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
+                pattern: "{controller=Transaction}/{action=Index}/{id?}");
 
             app.Run();
         }

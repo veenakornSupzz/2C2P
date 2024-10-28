@@ -12,7 +12,7 @@ namespace APP.Controllers
         public TransactionController(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("http://localhost:5000"); // เปลี่ยนเป็น API ของคุณ
+            _httpClient.BaseAddress = new Uri("https://localhost:7250"); 
         }
 
         // GET: /Transaction/Index

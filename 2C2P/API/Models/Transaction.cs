@@ -17,7 +17,7 @@ public partial class Transaction
 
     public DateTime? TransactionDate { get; set; }
 
-    public string? Status { get; set; }
+    public string Status { get; set; }
 
     public bool IsValid { get; set; }
 

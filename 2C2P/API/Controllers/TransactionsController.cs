@@ -28,7 +28,22 @@ namespace API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Transaction>>> GetTransactions()
         {
-            return await _context.Transactions.ToListAsync();
+            var transactions = await _context.Transactions.ToListAsync();
+
+            var mappedTransactions = transactions.Select(t => new
+            {
+                Id = t.Id,
+                TransactionId = t.TransactionId,
+                AccountNumber = t.AccountNumber,
+                Amount = t.Amount,
+                CurrencyCode = t.CurrencyCode,
+                TransactionDate = t.TransactionDate,
+                Status = MapStatus(t.Status),
+                IsValid = t.IsValid,
+                CreatedAt = t.CreatedAt
+            }).ToList();
+
+            return Ok(mappedTransactions);
         }
 
         [HttpGet("currency/{currencyCode}")]
@@ -41,21 +56,54 @@ namespace API.Controllers
         }
 
         [HttpGet("date")]
-        public async Task<ActionResult<IEnumerable<Transaction>>> GetByDateRange(DateTime startDate, DateTime endDate)
+        public async Task<ActionResult<IEnumerable<Transaction>>> GetByDateRange(DateTime? startDate, DateTime? endDate)
         {
-            var transactions = await _context.Transactions
-                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
-                .ToListAsync();
+            // ตรวจสอบว่า startDate น้อยกว่า endDate
+            if (startDate.HasValue && endDate.HasValue && startDate > endDate)
+            {
+                return BadRequest("Start date must be less than or equal to end date.");
+            }
+
+            var query = _context.Transactions.AsQueryable();
+
+            // ถ้ามี startDate ให้ค้นหาตั้งแต่ startDate ขึ้นไป
+            if (startDate.HasValue)
+            {
+                query = query.Where(t => t.TransactionDate >= startDate.Value);
+            }
+
+            // ถ้ามี endDate ให้ค้นหาถึง endDate
+            if (endDate.HasValue)
+            {
+                query = query.Where(t => t.TransactionDate <= endDate.Value);
+            }
+
+            var transactions = await query.ToListAsync();
             return transactions;
         }
 
         [HttpGet("status/{status}")]
         public async Task<ActionResult<IEnumerable<Transaction>>> GetByStatus(string status)
         {
-            var transactions = await _context.Transactions
-                .Where(t => t.Status == status)
-                .ToListAsync();
-            return transactions;
+            // Mapping status ที่ส่งเข้ามาให้เป็นกลุ่มของสถานะจริงในฐานข้อมูล
+            List<string> mappedStatuses = status switch
+            {
+                "A" => new List<string> { "Approved" },
+                "R" => new List<string> { "Rejected", "Failed" },
+                "D" => new List<string> { "Finished", "Done" },
+                _ => new List<string> { status } // กรณีที่ status ไม่ได้ map ไว้ ใช้ค่านั้นเลย
+            };
+
+            // แปลงค่าใน mappedStatuses เป็นตัวพิมพ์ใหญ่และลบช่องว่างทั้งหมด
+            mappedStatuses = mappedStatuses.Select(s => s.ToUpper().Trim()).ToList();
+
+            // ดึงข้อมูลจากฐานข้อมูลแล้วใช้ Contains ในหน่วยความจำ
+            var transactions = _context.Transactions
+                .AsEnumerable() // โหลดข้อมูลทั้งหมดมาที่ memory
+                .Where(t => mappedStatuses.Contains(t.Status?.ToUpper().Trim() ?? string.Empty)) // ใช้ Contains กับ ToUpper และ Trim
+                .ToList(); // ใช้ ToList() แทน ToListAsync()
+
+            return Ok(transactions);
         }
 
         [HttpPost("upload")]
@@ -78,7 +126,7 @@ namespace API.Controllers
                     {
                         using (var reader = new StreamReader(stream))
                         {
-                            string headerLine = await reader.ReadLineAsync(); 
+                            string headerLine = await reader.ReadLineAsync();
 
                             while (!reader.EndOfStream)
                             {
@@ -89,15 +137,16 @@ namespace API.Controllers
                                 {
                                     var transaction = new Transaction
                                     {
-                                        TransactionId = values[0],
-                                        AccountNumber = values[1],
-                                        Amount = decimal.TryParse(values[2], out var amount) ? amount : 0,
-                                        CurrencyCode = values[3],
-                                        Status = values[5]
+                                        TransactionId = values[0].Trim('"'),
+                                        AccountNumber = values[1].Trim('"'),
+                                        Amount = decimal.TryParse(values[2].Trim('"'), out var amount) ? amount : 0,
+                                        CurrencyCode = values[3].Trim('"'),
+                                        Status = values[5].Trim('"')
                                     };
 
-                                    var dateFormats = new[] { "yyyy-MM-dd HH:mm:ss" };
-                                    if (DateTime.TryParseExact(values[4], dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                                    var dateFormats = new[] { "dd-MM-yyyy HH:mm:ss", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss" };
+                                    var dateString = values[4].Trim('"');
+                                    if (DateTime.TryParseExact(dateString, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                                     {
                                         if (date >= (DateTime)SqlDateTime.MinValue && date <= (DateTime)SqlDateTime.MaxValue)
                                         {
@@ -174,6 +223,20 @@ namespace API.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetTransaction", new { id = transaction.Id }, transaction);
+        }
+
+
+        private string MapStatus(string status)
+        {
+            return status switch
+            {
+                "Approved" => "A",
+                "Failed" => "R",
+                "Finished" => "D",
+                "Rejected" => "R",
+                "Done" => "D",
+                _ => status
+            };
         }
 
 

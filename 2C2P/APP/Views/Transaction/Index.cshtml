@@ -1,4 +1,4 @@
-﻿@model List<APP.Models.Transaction>
+﻿@model List<APP.Models.AppTransaction>
 @{
     ViewData["Title"] = "Transaction Management";
 }
@@ -56,113 +56,146 @@
 
     @if (Model != null && Model.Count > 0)
     {
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead class="table-primary">
-                    <tr>
-                        <th>ID</th>
-                        <th>Transaction ID</th>
-                        <th>Amount</th>
-                        <th>Currency</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                     @foreach (var transaction in Model)
                     {
-                        <tr>
-                            <td>@transaction.Id</td>
-                            <td>@transaction.TransactionId</td>
-                            <td>@transaction.Amount</td>
-                            <td>@transaction.CurrencyCode</td>
-                            <td>@transaction.Status</td>
-                        </tr>
+                                <tr>
+                                    <td>@transaction.TransactionId</td>
+                                    <td>@transaction.Payment</td>
+                                    <td>@transaction.Status</td>
+                                </tr>
                     }
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls -->
+            <nav aria-label="Page navigation example">
+                <ul class="pagination justify-content-end">
+                @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link" href="?pageNumber=@i">@i</a>
+                            </li>
+                }
+                </ul>
+            </nav>
     }
     else
     {
-        <p class="text-center mt-4">No transactions found.</p>
+            <p class="text-center mt-4">No transactions found.</p>
     }
 </div>
 
 @section Scripts {
-    <script>
-        // Toggle Search Fields Based on Selection
-        function toggleSearchFields() {
-            const searchType = document.getElementById('searchType').value;
-            const searchInputDiv = document.getElementById('defaultSearchInput');
-            const searchInput = document.getElementById('searchInput');
-            const dateRangeInputs = document.getElementById('dateRangeInputs');
-            const startDateInput = document.getElementById('startDate');
-            const endDateInput = document.getElementById('endDate');
+        <script>
 
-            if (searchType === 'all') {
-                // Show the default input but disable it
-                searchInputDiv.classList.remove('d-none');
-                searchInput.value = '';
-                searchInput.setAttribute('disabled', 'disabled');
-
-                // Hide date range inputs and disable them
-                dateRangeInputs.classList.add('d-none');
-                startDateInput.value = '';
-                endDateInput.value = '';
-                startDateInput.setAttribute('disabled', 'disabled');
-                endDateInput.setAttribute('disabled', 'disabled');
-            } else if (searchType === 'date') {
-                // Hide the default input and disable it
-                searchInputDiv.classList.add('d-none');
-                searchInput.value = '';
-                searchInput.setAttribute('disabled', 'disabled');
-
-                // Show date range inputs and enable them
-                dateRangeInputs.classList.remove('d-none');
-                startDateInput.removeAttribute('disabled');
-                endDateInput.removeAttribute('disabled');
-            } else {
-                // Show the default input and enable it
-                searchInputDiv.classList.remove('d-none');
-                searchInput.removeAttribute('disabled');
-
-                // Hide date range inputs and disable them
-                dateRangeInputs.classList.add('d-none');
-                startDateInput.value = '';
-                endDateInput.value = '';
-                startDateInput.setAttribute('disabled', 'disabled');
-                endDateInput.setAttribute('disabled', 'disabled');
-            }
-        }
-
-        // Initialize Flatpickr for Date Range Inputs
-        flatpickr("#startDate", {
-            enableTime: true,
-            dateFormat: "Y-m-d H:i",
-        });
-
-        flatpickr("#endDate", {
-            enableTime: true,
-            dateFormat: "Y-m-d H:i",
-        });
-
-        // Call toggleSearchFields() on page load to initialize the correct state
         document.addEventListener('DOMContentLoaded', function () {
-            toggleSearchFields();
-        });
+            // SweetAlert Notification สำหรับแสดงข้อผิดพลาด
+            var errorMessage = "@TempData["ErrorMessage"]";
+            if (errorMessage) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Date Range',
+                    text: errorMessage,
+                    confirmButtonText: 'OK'
+                });
+            }
+            // SweetAlert Notification
+            var message = "@TempData["Message"]";
+            var status = "@TempData["Status"]";
+            if (message) {
+                Swal.fire({
+                    icon: status === "success" ? 'success' : 'error',
+                    title: status === "success" ? 'Upload Successful' : 'Upload Failed',
+                    text: message,
+                    confirmButtonText: 'OK'
+                });
+            }
 
-        // Initialize Flatpickr for Date Range Inputs
-        flatpickr("#startDate", {
-            enableTime: true,
-            dateFormat: "Y-m-d H:i",
-        });
+            // Enable date range inputs before form submission if 'Date Range' is selected
+            const searchForm = document.querySelector('form[asp-action="Search"]');
+            if (searchForm) {
+                searchForm.addEventListener('submit', function () {
+                    const searchType = document.getElementById('searchType').value;
+                    if (searchType === 'date') {
+                        document.getElementById('startDate').removeAttribute('disabled');
+                        document.getElementById('endDate').removeAttribute('disabled');
+                    }
+                });
+            }
+        });            // Toggle Search Fields Based on Selection
+            function toggleSearchFields() {
+                const searchType = document.getElementById('searchType').value;
+                const searchInputDiv = document.getElementById('defaultSearchInput');
+                const searchInput = document.getElementById('searchInput');
+                const dateRangeInputs = document.getElementById('dateRangeInputs');
+                const startDateInput = document.getElementById('startDate');
+                const endDateInput = document.getElementById('endDate');
 
-        flatpickr("#endDate", {
-            enableTime: true,
-            dateFormat: "Y-m-d H:i",
-        });
+                if(searchType === 'all') {
+                    // Show the default input but disable it
+                    searchInputDiv.classList.remove('d-none');
+                    searchInput.value = '';
+                    searchInput.setAttribute('disabled', 'disabled');
 
-        // Call toggleSearchFields() on page load to initialize the correct state
-        document.addEventListener('DOMContentLoaded', toggleSearchFields);
-    </script>
+                    // Hide date range inputs and disable them
+                    dateRangeInputs.classList.add('d-none');
+                    startDateInput.value = '';
+                    endDateInput.value = '';
+                    startDateInput.setAttribute('disabled', 'disabled');
+                    endDateInput.setAttribute('disabled', 'disabled');
+                } else if (searchType === 'date') {
+                    // Hide the default input and disable it
+                    searchInputDiv.classList.add('d-none');
+                    searchInput.value = '';
+                    searchInput.setAttribute('disabled', 'disabled');
+
+                    // Show date range inputs and enable them
+                    dateRangeInputs.classList.remove('d-none');
+                    startDateInput.removeAttribute('disabled');
+                    endDateInput.removeAttribute('disabled');
+                } else {
+                    // Show the default input and enable it
+                    searchInputDiv.classList.remove('d-none');
+                    searchInput.removeAttribute('disabled');
+
+                    // Hide date range inputs and disable them
+                    dateRangeInputs.classList.add('d-none');
+                    startDateInput.value = '';
+                    endDateInput.value = '';
+                    startDateInput.setAttribute('disabled', 'disabled');
+                    endDateInput.setAttribute('disabled', 'disabled');
+                }
+
+            }
+
+
+
+            // Initialize Flatpickr for Date Range Inputs
+            flatpickr("#startDate", {
+                enableTime: true,
+                dateFormat: "Y-m-d H:i",
+            });
+
+            flatpickr("#endDate", {
+                enableTime: true,
+                dateFormat: "Y-m-d H:i",
+            });
+
+            // Call toggleSearchFields() on page load to initialize the correct state
+            document.addEventListener('DOMContentLoaded', function () {
+                toggleSearchFields();
+            });
+
+        </script>
+
 }

@@ -1,5 +1,9 @@
 
+using API.Factory;
+using API.Helpers;
 using API.Models;
+using API.Repository;
+using API.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace API
@@ -10,20 +14,26 @@ namespace API
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
 
             builder.Services.AddDbContext<TransactionContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+            builder.Services.AddScoped<ITransactionService, TransactionService>();
+
+            //Design Pattern for FileService
+            builder.Services.AddScoped<IFileProcessorService, FileProcessorService>();
+            builder.Services.AddScoped<FileProcessingStrategyFactory>();
+
+            builder.Services.AddAutoMapper(typeof(MappingProfile));
+
 
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();

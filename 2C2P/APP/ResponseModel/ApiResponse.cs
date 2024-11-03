@@ -7,7 +7,6 @@
         public T Data { get; set; }
         public string Error { get; set; }
 
-        // คอนสตรัคเตอร์ที่รับ 4 อาร์กิวเมนต์
         public ApiResponse(bool success, string message, T data, string error = null)
         {
             Success = success;

@@ -1,5 +1,6 @@
 ﻿using API.Models;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace API.Strategies
 {
@@ -15,7 +16,8 @@ namespace API.Strategies
                 while (!reader.EndOfStream)
                 {
                     var line = await reader.ReadLineAsync();
-                    var values = line.Split(',');
+                    // Use Regex to split by commas that are outside of quotes
+                    var values = Regex.Split(line, ",(?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))");
 
                     if (values.Length >= 5)
                     {
@@ -23,9 +25,9 @@ namespace API.Strategies
                         {
                             TransactionId = values[0].Trim('"'),
                             AccountNumber = values[1].Trim('"'),
-                            Amount = decimal.TryParse(values[2].Trim('"'), out var amount) ? amount : 0,
-                            CurrencyCode = values[3].Trim('"'),
-                            Status = values[5].Trim('"'),
+                            Amount = decimal.TryParse(values[2].Trim('"'), NumberStyles.Any, CultureInfo.InvariantCulture, out var amount) ? amount : 0,
+                            CurrencyCode = ValidateCurrencyCode(values[3].Trim('"')) ? values[3].Trim('"') : null,
+                            Status = MapStatus(values[5].Trim('"'), isCsv: true),
                             TransactionDate = ParseDate(values[4].Trim('"'))
                         };
                         transactions.Add(transaction);
@@ -37,12 +39,32 @@ namespace API.Strategies
 
         private DateTime? ParseDate(string dateString)
         {
-            var dateFormats = new[] { "dd-MM-yyyy HH:mm:ss", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss" };
+            var dateFormats = new[] { "dd/MM/yyyy HH:mm:ss" }; 
             if (DateTime.TryParseExact(dateString, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             {
                 return date;
             }
             return null;
+        }
+
+        private string MapStatus(string status, bool isCsv)
+        {
+            if (isCsv)
+            {
+                return status switch
+                {
+                    "Approved" => "Approved",
+                    "Failed" => "Failed",
+                    "Finished" => "Finished",
+                    _ => null
+                };
+            }
+            return null;
+        }
+
+        private bool ValidateCurrencyCode(string code)
+        {
+            return Regex.IsMatch(code, @"^[A-Z]{3}$");
         }
     }
 }

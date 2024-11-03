@@ -10,29 +10,34 @@ namespace APP.Services
     {
         private readonly HttpClient _httpClient;
 
-        public TransactionService(HttpClient httpClient)
+        public TransactionService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("https://localhost:7250");
-            _httpClient.Timeout = TimeSpan.FromSeconds(300);
+            var baseUrl = configuration["ApiSettings:BaseUrl"];
+            var timeoutInSeconds = int.Parse(configuration["ApiSettings:TimeoutInSeconds"]);
+
+            _httpClient.BaseAddress = new Uri(baseUrl);
+            _httpClient.Timeout = TimeSpan.FromSeconds(timeoutInSeconds);
         }
 
         private async Task<ApiResponse<T>> ProcessApiResponse<T>(HttpResponseMessage response)
         {
             var jsonString = await response.Content.ReadAsStringAsync();
 
-            // Optional: Log jsonString for debugging
-            Console.WriteLine(jsonString);
 
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true // ให้รองรับ JSON key แบบ case-insensitive
             };
 
-            // ใช้การตรวจสอบ response ก่อน Deserialize
+
             if (!response.IsSuccessStatusCode)
             {
-                return new ApiResponse<T>(false, "Failed to process API response.", default, response.ReasonPhrase);
+                // Deserialize jsonString เพื่อดึงข้อความ error จากฝั่ง API
+                var apiErrorResponse = JsonSerializer.Deserialize<ApiResponse<T>>(jsonString, options);
+                var errorMessage = apiErrorResponse?.Error ?? response.ReasonPhrase;
+
+                return new ApiResponse<T>(false, "Failed to process API response.", default, errorMessage);
             }
 
             return JsonSerializer.Deserialize<ApiResponse<T>>(jsonString, options);

@@ -101,27 +101,27 @@
         document.addEventListener('DOMContentLoaded', function () {
             // SweetAlert Notification สำหรับแสดงข้อผิดพลาด
             var errorMessage = "@TempData["ErrorMessage"]";
-            if (errorMessage) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Invalid Date Range',
-                    text: errorMessage,
-                    confirmButtonText: 'OK'
-                });
-            }
+            if (errorMessage) {                   
+                    errorMessage = errorMessage.replace(/\.\s*/g, '.<br>');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid Date Range',
+                        html: `<span style="color: red; font-size: smaller;">${errorMessage}</span>`,
+                        confirmButtonText: 'OK'
+                    });
+            }            
             // SweetAlert Notification
             var message = "@TempData["Message"]";
             var status = "@TempData["Status"]";
             if (message) {
+                message = message.replace(/;\s*/g, '<br>');
                 Swal.fire({
                     icon: status === "success" ? 'success' : 'error',
                     title: status === "success" ? 'Upload Successful' : 'Upload Failed',
-                    text: message,
+                    html: `<span style="font-size: smaller; ${status === "error" ? 'color: red;' : ''}">${message}</span>`,
                     confirmButtonText: 'OK'
                 });
             }
-
-            // Enable date range inputs before form submission if 'Date Range' is selected
             const searchForm = document.querySelector('form[asp-action="Search"]');
             if (searchForm) {
                 searchForm.addEventListener('submit', function () {
@@ -132,7 +132,7 @@
                     }
                 });
             }
-        });            // Toggle Search Fields Based on Selection
+        });            
             function toggleSearchFields() {
                 const searchType = document.getElementById('searchType').value;
                 const searchInputDiv = document.getElementById('defaultSearchInput');
@@ -142,33 +142,27 @@
                 const endDateInput = document.getElementById('endDate');
 
                 if(searchType === 'all') {
-                    // Show the default input but disable it
                     searchInputDiv.classList.remove('d-none');
                     searchInput.value = '';
                     searchInput.setAttribute('disabled', 'disabled');
 
-                    // Hide date range inputs and disable them
                     dateRangeInputs.classList.add('d-none');
                     startDateInput.value = '';
                     endDateInput.value = '';
                     startDateInput.setAttribute('disabled', 'disabled');
                     endDateInput.setAttribute('disabled', 'disabled');
                 } else if (searchType === 'date') {
-                    // Hide the default input and disable it
                     searchInputDiv.classList.add('d-none');
                     searchInput.value = '';
                     searchInput.setAttribute('disabled', 'disabled');
 
-                    // Show date range inputs and enable them
                     dateRangeInputs.classList.remove('d-none');
                     startDateInput.removeAttribute('disabled');
                     endDateInput.removeAttribute('disabled');
                 } else {
-                    // Show the default input and enable it
                     searchInputDiv.classList.remove('d-none');
                     searchInput.removeAttribute('disabled');
 
-                    // Hide date range inputs and disable them
                     dateRangeInputs.classList.add('d-none');
                     startDateInput.value = '';
                     endDateInput.value = '';
@@ -191,7 +185,6 @@
                 dateFormat: "Y-m-d H:i",
             });
 
-            // Call toggleSearchFields() on page load to initialize the correct state
             document.addEventListener('DOMContentLoaded', function () {
                 toggleSearchFields();
             });

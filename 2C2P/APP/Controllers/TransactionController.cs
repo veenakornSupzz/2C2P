@@ -8,24 +8,26 @@ namespace APP.Controllers
     public class TransactionController : Controller
     {
         private readonly ITransactionService _transactionService;
+        private readonly int _pageSize;
 
-        public TransactionController(ITransactionService transactionService)
+        public TransactionController(ITransactionService transactionService, IConfiguration configuration)
         {
             _transactionService = transactionService;
+            _pageSize = int.Parse(configuration["PaginationSettings:PageSize"]);
         }
 
-        public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 4)
+        public async Task<IActionResult> Index(int pageNumber = 1)
         {
             var apiResponse = await _transactionService.GetTransactionsAsync();
             if (apiResponse.Success)
             {
                 var transactions = apiResponse.Data;
                 var pagedTransactions = transactions
-                    .Skip((pageNumber - 1) * pageSize)
-                    .Take(pageSize)
+                    .Skip((pageNumber - 1) * _pageSize)
+                    .Take(_pageSize)
                     .ToList();
 
-                ViewBag.TotalPages = (int)Math.Ceiling(transactions.Count / (double)pageSize);
+                ViewBag.TotalPages = (int)Math.Ceiling(transactions.Count / (double)_pageSize);
                 ViewBag.CurrentPage = pageNumber;
 
                 return View(pagedTransactions);
@@ -38,8 +40,19 @@ namespace APP.Controllers
         [HttpPost]
         public async Task<IActionResult> Upload(IFormFile file)
         {
+            const long maxFileSize = 1 * 1024 * 1024; // 1 MB
+
+            if (file == null || file.Length > maxFileSize)
+            {
+                TempData["Message"] = file == null
+                    ? "No file selected for upload."
+                    : "File size exceeds the 1 MB limit.";
+                TempData["Status"] = "error";
+                return RedirectToAction("Index");
+            }
+
             var apiResponse = await _transactionService.UploadTransactionFileAsync(file);
-            TempData["Message"] = apiResponse.Message;
+            TempData["Message"] = apiResponse.Success ? apiResponse.Message : apiResponse.Error ?? "An unexpected error occurred.";
             TempData["Status"] = apiResponse.Success ? "success" : "error";
             return RedirectToAction("Index");
         }

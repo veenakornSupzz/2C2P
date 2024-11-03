@@ -13,6 +13,7 @@ using System.Xml.Linq;
 using API.Services;
 using API.Dto;
 using API.ResponseModels;
+using System.ComponentModel.DataAnnotations;
 
 namespace API.Controllers
 {
@@ -23,6 +24,7 @@ namespace API.Controllers
         private readonly TransactionContext _context;
         private readonly ITransactionService _transactionService;
         private readonly IFileProcessorService _fileProcessorService;
+
 
 
         public TransactionsController(TransactionContext context, ITransactionService transactionService, IFileProcessorService fileProcessorService)
@@ -125,149 +127,84 @@ namespace API.Controllers
         [HttpPost("upload")]
         public async Task<IActionResult> UploadTransactionFile([FromForm] IFormFile file)
         {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResponse("Invalid file.", "File cannot be empty."));
+            }
+
             try
             {
+                // Log file upload start
+                var logEntry = new TransactionLog { TransactionId = Guid.NewGuid().ToString(), FileName = file.FileName, LogMessage = "File upload started.", CreatedAt = DateTime.UtcNow };
+                _context.TransactionLogs.Add(logEntry);
+                await _context.SaveChangesAsync();
+
+                // Process the file
                 var transactions = await _fileProcessorService.ProcessFileAsync(file);
-                await _transactionService.SaveTransactionsAsync(transactions); 
+
+                // Validate each transaction
+                var invalidTransactions = new List<(Transaction transaction, List<string> errors)>();
+                foreach (var transaction in transactions)
+                {
+                    var context = new ValidationContext(transaction, serviceProvider: null, items: null);
+                    var validationResults = new List<ValidationResult>();
+
+                    if (!Validator.TryValidateObject(transaction, context, validationResults, validateAllProperties: true))
+                    {
+                        var errors = validationResults.Select(vr => vr.ErrorMessage).ToList();
+                        invalidTransactions.Add((transaction, errors));
+                    }
+                }
+
+                if (invalidTransactions.Any())
+                {
+                    var errorDetails = string.Join("; ", invalidTransactions.Select(it =>
+                        $"TransactionId: {it.transaction.TransactionId}, Errors: {string.Join(", ", it.errors)}"));
+
+                    // Log validation failure
+                    logEntry.LogMessage = $"Validation failed: {errorDetails}";
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(ApiResponse<string>.ErrorResponse("Validation failed for one or more transactions.", errorDetails));
+                }
+
+                // Save valid transactions
+                await _transactionService.SaveTransactionsAsync(transactions);
+
+                // Log successful processing
+                logEntry.LogMessage = "File uploaded and transactions saved successfully.";
+                await _context.SaveChangesAsync();
 
                 return Ok(ApiResponse<string>.SuccessResponse("File uploaded and transactions saved successfully.", null));
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ApiResponse<string>.ErrorResponse(ex.Message, null));
+                // Log argument exception
+                var logEntry = new TransactionLog { TransactionId = Guid.NewGuid().ToString(), FileName = file.FileName, LogMessage = $"Argument error: {ex.Message}", CreatedAt = DateTime.UtcNow };
+                
+                _context.TransactionLogs.Add(logEntry);
+                await _context.SaveChangesAsync();
+
+                return BadRequest(ApiResponse<string>.ErrorResponse(ex.Message, ex.Message));
             }
             catch (NotSupportedException ex)
             {
-                return BadRequest(ApiResponse<string>.ErrorResponse(ex.Message, null));
+                // Log not supported exception
+                var logEntry = new TransactionLog { TransactionId = Guid.NewGuid().ToString(), FileName = file.FileName, LogMessage = $"Unsupported file format: {ex.Message}", CreatedAt = DateTime.UtcNow };
+                _context.TransactionLogs.Add(logEntry);
+                await _context.SaveChangesAsync();
+
+                return BadRequest(ApiResponse<string>.ErrorResponse(ex.Message, ex.Message));
             }
             catch (Exception ex)
             {
+                // Log generic exception
+                var logEntry = new TransactionLog { TransactionId = Guid.NewGuid().ToString(), FileName = file.FileName, LogMessage = $"Internal server error: {ex.Message}", CreatedAt = DateTime.UtcNow };
+                _context.TransactionLogs.Add(logEntry);
+                await _context.SaveChangesAsync();
+
                 return StatusCode(500, ApiResponse<string>.ErrorResponse("Internal server error.", ex.Message));
             }
         }
-
-
-        //[HttpPost("upload")]
-        //public async Task<IActionResult> UploadTransactionFile([FromForm] IFormFile file)
-        //{
-        //    if (file == null || file.Length == 0)
-        //    {
-        //        return BadRequest("No file uploaded or file is empty.");
-        //    }
-
-        //    var transactions = new List<Transaction>();
-
-        //    var extension = Path.GetExtension(file.FileName).ToLower();
-
-        //    try
-        //    {
-        //        using (var stream = file.OpenReadStream())
-        //        {
-        //            if (extension == ".csv")
-        //            {
-        //                using (var reader = new StreamReader(stream))
-        //                {
-        //                    string headerLine = await reader.ReadLineAsync();
-
-        //                    while (!reader.EndOfStream)
-        //                    {
-        //                        var line = await reader.ReadLineAsync();
-        //                        var values = line.Split(',');
-
-        //                        if (values.Length >= 5)
-        //                        {
-        //                            var transaction = new Transaction
-        //                            {
-        //                                TransactionId = values[0].Trim('"'),
-        //                                AccountNumber = values[1].Trim('"'),
-        //                                Amount = decimal.TryParse(values[2].Trim('"'), out var amount) ? amount : 0,
-        //                                CurrencyCode = values[3].Trim('"'),
-        //                                Status = values[5].Trim('"')
-        //                            };
-
-        //                            var dateFormats = new[] { "dd-MM-yyyy HH:mm:ss", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss" };
-        //                            var dateString = values[4].Trim('"');
-        //                            if (DateTime.TryParseExact(dateString, dateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
-        //                            {
-        //                                if (date >= (DateTime)SqlDateTime.MinValue && date <= (DateTime)SqlDateTime.MaxValue)
-        //                                {
-        //                                    transaction.TransactionDate = date;
-        //                                }
-        //                                else
-        //                                {
-        //                                    transaction.TransactionDate = null;
-        //                                }
-        //                            }
-        //                            else
-        //                            {
-        //                                transaction.TransactionDate = null;
-        //                            }
-
-        //                            transactions.Add(transaction);
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //            else if (extension == ".xml")
-        //            {
-        //                var xml = XDocument.Load(stream);
-
-        //                var transactionElements = xml.Descendants("Transaction");
-
-        //                foreach (var element in transactionElements)
-        //                {
-        //                    var transaction = new Transaction
-        //                    {
-        //                        TransactionId = element.Attribute("id")?.Value,
-        //                        AccountNumber = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "AccountNo")?.Value,
-        //                        Amount = decimal.TryParse(
-        //                            element.Descendants().FirstOrDefault(e => e.Name.LocalName == "Amount")?.Value, out var amount) ? amount : 0,
-        //                        CurrencyCode = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "CurrencyCode")?.Value,
-        //                        Status = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "Status")?.Value
-        //                    };
-
-
-        //                    var transactionDateString = element.Descendants().FirstOrDefault(e => e.Name.LocalName == "TransactionDate")?.Value;
-        //                    if (DateTime.TryParse(transactionDateString, out var date))
-        //                    {
-        //                        transaction.TransactionDate = date;
-        //                    }
-        //                    else
-        //                    {
-        //                        transaction.TransactionDate = DateTime.MinValue;
-        //                    }
-
-        //                    transactions.Add(transaction);
-        //                }
-        //            }
-        //            else
-        //            {
-        //                return BadRequest("Unsupported file format. Only CSV and XML are supported.");
-        //            }
-        //        }
-
-        //        _context.Transactions.AddRange(transactions);
-        //        await _context.SaveChangesAsync();
-
-        //        return Ok(new { message = "File uploaded and transactions saved successfully." });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, $"Internal server error: {ex.Message}");
-        //    }
-        //}
-
-        [HttpPost]
-        public async Task<ActionResult<Transaction>> PostTransaction(Transaction transaction)
-        {
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetTransaction", new { id = transaction.Id }, transaction);
-        }
-
-
-
-
     }
 }

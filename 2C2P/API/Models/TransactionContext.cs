@@ -40,7 +40,6 @@ public partial class TransactionContext : DbContext
                 .HasMaxLength(3)
                 .IsUnicode(false)
                 .IsFixedLength();
-            entity.Property(e => e.IsValid).HasDefaultValue(true);
             entity.Property(e => e.Status)
                 .HasMaxLength(1)
                 .IsUnicode(false)
